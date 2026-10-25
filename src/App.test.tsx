@@ -241,7 +241,7 @@ describe('Objectif journalier', () => {
     await allerA(utilisateur, 'Historique')
 
     expect(screen.getByRole('heading', { name: 'Historique' })).toBeInTheDocument()
-    expect(screen.getByText("Aucune Journée passée pour l'instant.")).toBeInTheDocument()
+    expect(await screen.findByText("Aucune Journée passée pour l'instant.")).toBeInTheDocument()
     expect(within(screen.getByRole('navigation')).getByRole('button', { name: 'Historique' })).toHaveAttribute(
       'aria-current',
       'page',
@@ -559,3 +559,86 @@ describe('ligne de Quantité attendue sur le verre', () => {
     await waitFor(async () => expect(await annonce()).toBe('1,50 / 1,50 L · 100 %'))
   })
 })
+
+describe('Historique', () => {
+  const mercredi14a10h = new Date(2026, 9, 14, 10, 0)
+
+  async function ouvrirHistorique(base: ReturnType<typeof nouvelleBase>) {
+    const utilisateur = userEvent.setup()
+    render(<App base={base} horloge={horlogeFixe(mercredi14a10h)} />)
+    await utilisateur.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'Historique' }))
+    return utilisateur
+  }
+
+  const journeesAffichees = async () =>
+    within(await screen.findByRole('list', { name: 'Journées passées' }))
+      .getAllByRole('listitem')
+      .map((ligne) => ligne.textContent)
+
+  it('liste les Journées passées avec Prise, de la plus récente à la plus ancienne', async () => {
+    const base = nouvelleBase()
+    await base.ajouterPrise(500, new Date(2026, 9, 12, 9, 0))
+    await base.ajouterPrise(500, new Date(2026, 9, 12, 15, 0))
+    await base.ajouterPrise(250, new Date(2026, 9, 13, 9, 0))
+    // La Journée en cours n'apparaît pas, et le 11 octobre n'a aucune Prise.
+    await base.ajouterPrise(500, new Date(2026, 9, 14, 8, 0))
+
+    await ouvrirHistorique(base)
+
+    expect(await journeesAffichees()).toEqual(['mar. 13 oct. · 0,25 / 1,50 L', 'lun. 12 oct. · 1,00 / 1,50 L'])
+  })
+
+  it('marque d’un ✓ seulement les Journées où l’objectif est atteint', async () => {
+    const base = nouvelleBase()
+    for (const heure of [8, 12, 18]) await base.ajouterPrise(500, new Date(2026, 9, 12, heure, 0))
+    await base.ajouterPrise(500, new Date(2026, 9, 13, 9, 0))
+
+    await ouvrirHistorique(base)
+    const lignes = within(await screen.findByRole('list', { name: 'Journées passées' })).getAllByRole('listitem')
+
+    expect(within(lignes[0]).queryByRole('img', { name: 'Objectif atteint' })).not.toBeInTheDocument()
+    expect(within(lignes[1]).getByRole('img', { name: 'Objectif atteint' })).toBeInTheDocument()
+  })
+
+  it('affiche pour chaque Journée l’Objectif journalier qu’elle avait', async () => {
+    const base = nouvelleBase()
+    await base.ajouterPrise(250, new Date(2026, 9, 11, 9, 0))
+    await base.ajouterPrise(250, new Date(2026, 9, 13, 9, 0))
+    // L'objectif passe à 1,75 L à partir du 12 octobre.
+    await base.ajusterObjectif('2026-10-12', 250)
+
+    await ouvrirHistorique(base)
+
+    expect(await journeesAffichees()).toEqual(['mar. 13 oct. · 0,25 / 1,75 L', 'dim. 11 oct. · 0,25 / 1,50 L'])
+  })
+
+  it('range une Prise bue entre minuit et 4 h dans la Journée de la veille', async () => {
+    const base = nouvelleBase()
+    await base.ajouterPrise(500, new Date(2026, 9, 12, 20, 0))
+    await base.ajouterPrise(250, new Date(2026, 9, 13, 1, 30))
+
+    await ouvrirHistorique(base)
+
+    expect(await journeesAffichees()).toEqual(['lun. 12 oct. · 0,75 / 1,50 L'])
+  })
+
+  it('montre les Prises d’une Journée passée, en lecture seule', async () => {
+    const base = nouvelleBase()
+    await base.ajouterPrise(500, new Date(2026, 9, 12, 9, 0))
+    await base.ajouterPrise(125, new Date(2026, 9, 12, 17, 45))
+    const utilisateur = await ouvrirHistorique(base)
+
+    await utilisateur.click(await screen.findByRole('button', { name: /lun\. 12 oct\./ }))
+
+    const detail = await screen.findByRole('list', { name: 'Prises de lun. 12 oct.' })
+    expect(within(detail).getAllByRole('listitem').map((ligne) => ligne.textContent)).toEqual([
+      '09:00 · 50 cl',
+      '17:45 · 12,5 cl',
+    ])
+    expect(within(detail).queryAllByRole('button')).toHaveLength(0)
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Retour' }))
+    expect(await screen.findByRole('list', { name: 'Journées passées' })).toBeInTheDocument()
+  })
+})
+

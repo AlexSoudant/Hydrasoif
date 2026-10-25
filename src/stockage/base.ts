@@ -72,7 +72,7 @@ export class Base extends Dexie {
     })
   }
 
-  /** Les Prises des Journées qui précèdent celle-ci, pour le Rythme habituel. */
+  /** Les Prises des Journées qui précèdent celle-ci (Rythme habituel, Historique). */
   async prisesAvant(journee: Journee): Promise<Prise[]> {
     return this.prises.where('horodatage').below(bornesDe(journee).debut).toArray()
   }

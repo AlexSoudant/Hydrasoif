@@ -50,6 +50,18 @@ export interface Prise {
   horodatage: number
 }
 
+/** Les Prises rangées par Journée ; seules les Journées qui en comptent au moins une apparaissent. */
+export function regrouperParJournee(prises: readonly Prise[]): Map<Journee, Prise[]> {
+  const parJournee = new Map<Journee, Prise[]>()
+  for (const prise of prises) {
+    const journee = journeeDe(new Date(prise.horodatage))
+    const prisesDeLaJournee = parJournee.get(journee)
+    if (prisesDeLaJournee) prisesDeLaJournee.push(prise)
+    else parJournee.set(journee, [prise])
+  }
+  return parJournee
+}
+
 /** La quantité totale de ces Prises, en millilitres. */
 export function sommeDes(prises: readonly Prise[]): number {
   return prises.reduce((total, prise) => total + prise.formatMl, 0)

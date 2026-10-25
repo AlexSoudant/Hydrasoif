@@ -3,9 +3,9 @@ import {
   instantDansJournee,
   journeeDe,
   minuteDeJournee,
+  regrouperParJournee,
   sommeDes,
   type FormatDeVerreMl,
-  type Journee,
   type Prise,
 } from './journee'
 
@@ -33,17 +33,12 @@ const JOURNEES_MINIMUM_DU_RYTHME_HABITUEL = 3
  */
 function partAttendueSelonRythmeHabituel(instant: Date, prisesPassees: readonly Prise[]): number | null {
   const journeeEnCours = journeeDe(instant)
-  const prisesParJournee = new Map<Journee, Prise[]>()
-  for (const prise of prisesPassees) {
-    const journee = journeeDe(new Date(prise.horodatage))
-    if (journee >= journeeEnCours) continue
-    const prisesDeLaJournee = prisesParJournee.get(journee)
-    if (prisesDeLaJournee) prisesDeLaJournee.push(prise)
-    else prisesParJournee.set(journee, [prise])
-  }
-
+  const prisesParJournee = regrouperParJournee(prisesPassees)
   // Le format AAAA-MM-JJ se trie correctement comme une chaîne.
-  const journeesRetenues = [...prisesParJournee.keys()].sort().slice(-JOURNEES_DU_RYTHME_HABITUEL)
+  const journeesRetenues = [...prisesParJournee.keys()]
+    .filter((journee) => journee < journeeEnCours)
+    .sort()
+    .slice(-JOURNEES_DU_RYTHME_HABITUEL)
   if (journeesRetenues.length < JOURNEES_MINIMUM_DU_RYTHME_HABITUEL) return null
 
   const minute = minuteDeJournee(instant)
