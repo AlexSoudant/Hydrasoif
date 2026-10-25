@@ -1,7 +1,7 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { act } from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import type { FormatDeVerreMl } from './calcul/journee'
 import { enCentilitres } from './format'
@@ -645,6 +645,145 @@ describe('Historique', () => {
 
     await utilisateur.click(screen.getByRole('button', { name: 'Retour' }))
     expect(await screen.findByRole('list', { name: 'Journées passées' })).toBeInTheDocument()
+  })
+})
+
+describe('Export et import JSON', () => {
+  const mercredi14a10h = new Date(2026, 9, 14, 10, 0)
+  let fichierTelecharge: Blob | null
+
+  beforeEach(() => {
+    fichierTelecharge = null
+    // jsdom ne sait ni créer d'URL de Blob ni télécharger : on récupère le fichier au passage.
+    URL.createObjectURL = vi.fn((blob: Blob) => {
+      fichierTelecharge = blob
+      return 'blob:hydrasoif'
+    })
+    URL.revokeObjectURL = vi.fn()
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  async function baseAvecDeuxJournees() {
+    const base = nouvelleBase()
+    await base.ajouterPrise(500, new Date(2026, 9, 12, 9, 0))
+    await base.ajouterPrise(250, new Date(2026, 9, 12, 21, 30))
+    await base.ajouterPrise(125, new Date(2026, 9, 13, 1, 15))
+    await base.ajouterPrise(500, new Date(2026, 9, 13, 10, 0))
+    await base.ajusterObjectif('2026-10-13', 250)
+    return base
+  }
+
+  async function ouvrir(ecran: string, base: ReturnType<typeof nouvelleBase>) {
+    const utilisateur = userEvent.setup()
+    render(<App base={base} horloge={horlogeFixe(mercredi14a10h)} />)
+    await utilisateur.click(within(screen.getByRole('navigation')).getByRole('button', { name: ecran }))
+    return utilisateur
+  }
+
+  async function exporter(base: ReturnType<typeof nouvelleBase>) {
+    const utilisateur = await ouvrir('Réglages', base)
+    await utilisateur.click(await screen.findByRole('button', { name: 'Exporter' }))
+    await waitFor(() => expect(fichierTelecharge).not.toBeNull())
+    const texte = await fichierTelecharge!.text()
+    cleanup()
+    return texte
+  }
+
+  async function importer(base: ReturnType<typeof nouvelleBase>, contenu: string) {
+    const utilisateur = await ouvrir('Réglages', base)
+    const fichier = new File([contenu], 'sauvegarde.json', { type: 'application/json' })
+    await utilisateur.upload(await screen.findByLabelText('Importer'), fichier)
+    return utilisateur
+  }
+
+  async function journeesDeLHistorique(utilisateur: ReturnType<typeof userEvent.setup>) {
+    await utilisateur.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'Historique' }))
+    const liste = await screen.findByRole('list', { name: 'Journées passées' })
+    return within(liste)
+      .getAllByRole('listitem')
+      .map((ligne) => ligne.textContent)
+  }
+
+  it('restaure dans une base vide les mêmes Journées, Prises et objectifs', async () => {
+    const texte = await exporter(await baseAvecDeuxJournees())
+    expect(JSON.parse(texte)).toMatchObject({ version: 1 })
+
+    const baseVide = nouvelleBase()
+    const utilisateur = await importer(baseVide, texte)
+    const confirmation = await screen.findByRole('alertdialog')
+    expect(confirmation).toHaveTextContent("Tu n'as encore aucune Journée : rien ne sera remplacé.")
+    await utilisateur.click(within(confirmation).getByRole('button', { name: 'Remplacer' }))
+
+    expect(await screen.findByText('Sauvegarde importée : 2 Journées.')).toBeInTheDocument()
+    expect(await screen.findByText('1,75 L')).toBeInTheDocument()
+    expect(await journeesDeLHistorique(utilisateur)).toEqual([
+      'mar. 13 oct. · 0,50 / 1,75 L',
+      'lun. 12 oct. · 0,88 / 1,50 L',
+    ])
+    await utilisateur.click(screen.getByRole('button', { name: /lun\. 12 oct\./ }))
+    expect(
+      within(await screen.findByRole('list', { name: 'Prises de lun. 12 oct.' }))
+        .getAllByRole('listitem')
+        .map((ligne) => ligne.textContent),
+    ).toEqual(['09:00 · 50 cl', '21:30 · 25 cl', '01:15 · 12,5 cl'])
+  })
+
+  it('ne modifie rien si la confirmation est annulée', async () => {
+    const texte = await exporter(await baseAvecDeuxJournees())
+    const autreBase = nouvelleBase()
+    await autreBase.ajouterPrise(250, new Date(2026, 9, 10, 9, 0))
+
+    const utilisateur = await importer(autreBase, texte)
+    const confirmation = await screen.findByRole('alertdialog')
+    expect(confirmation).toHaveTextContent('Ceci remplacera ta 1 Journée actuelle.')
+    await utilisateur.click(within(confirmation).getByRole('button', { name: 'Annuler' }))
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(await journeesDeLHistorique(utilisateur)).toEqual(['sam. 10 oct. · 0,25 / 1,50 L'])
+  })
+
+  it.each([
+    ['un JSON illisible', 'pas du JSON {'],
+    ['une mauvaise structure', JSON.stringify({ version: 1, prises: [{ formatMl: 333, horodatage: 'hier' }], objectifs: [] })],
+    ['une version inconnue', JSON.stringify({ version: 99, prises: [], objectifs: [] })],
+    [
+      'deux objectifs pour la même Journée',
+      JSON.stringify({
+        version: 1,
+        prises: [],
+        objectifs: [
+          { journee: '2026-10-12', objectifMl: 1250 },
+          { journee: '2026-10-12', objectifMl: 1750 },
+        ],
+      }),
+    ],
+    [
+      'un objectif hors du pas de 25 cl',
+      JSON.stringify({ version: 1, prises: [], objectifs: [{ journee: '2026-10-12', objectifMl: 1333 }] }),
+    ],
+    [
+      'une Journée impossible',
+      JSON.stringify({ version: 1, prises: [], objectifs: [{ journee: '2026-13-45', objectifMl: 1500 }] }),
+    ],
+    [
+      'un horodatage aberrant',
+      JSON.stringify({ version: 1, prises: [{ formatMl: 250, horodatage: -5 }], objectifs: [] }),
+    ],
+  ])('refuse %s sans rien modifier', async (_cas, contenu) => {
+    const base = await baseAvecDeuxJournees()
+
+    const utilisateur = await importer(base, contenu)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("Ce fichier n'est pas une sauvegarde Hydrasoif valide")
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(await journeesDeLHistorique(utilisateur)).toEqual([
+      'mar. 13 oct. · 0,50 / 1,75 L',
+      'lun. 12 oct. · 0,88 / 1,50 L',
+    ])
   })
 })
 

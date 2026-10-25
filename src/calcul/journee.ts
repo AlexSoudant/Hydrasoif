@@ -18,6 +18,14 @@ function instantLocal(journee: Journee, decalageJours: number, heures: number, m
   return new Date(annee, mois - 1, jour + decalageJours, heures, minutes)
 }
 
+/** Vrai si le texte est une Journée existante au format AAAA-MM-JJ (pas de 2026-13-45). */
+export function estJournee(texte: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(texte)) return false
+  const [annee, mois, jour] = texte.split('-').map(Number)
+  const date = new Date(annee, mois - 1, jour)
+  return date.getFullYear() === annee && date.getMonth() === mois - 1 && date.getDate() === jour
+}
+
 /** Premier et dernier instants (exclu) de la Journée, en millisecondes depuis l'époque Unix. */
 export function bornesDe(journee: Journee): { debut: number; fin: number } {
   return {
