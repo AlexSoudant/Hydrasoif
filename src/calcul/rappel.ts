@@ -28,8 +28,17 @@ export interface Rappel {
   formatProposeMl: FormatDeVerreMl
 }
 
-/** Le Rappel à afficher à cet instant, ou null si le Retard est inférieur à 12,5 cl. */
-export function rappelA(maintenant: Date, buMl: number, objectifMl: number): Rappel | null {
+/**
+ * Le Rappel à afficher à cet instant, ou null : Retard inférieur à 12,5 cl, ou Rappel masqué jusqu'à `masqueJusqua`.
+ * Une fois l'Objectif journalier atteint, il n'y a plus de Rappel : la Quantité attendue ne dépasse jamais l'objectif.
+ */
+export function rappelA(
+  maintenant: Date,
+  buMl: number,
+  objectifMl: number,
+  masqueJusqua: Date | null = null,
+): Rappel | null {
+  if (masqueJusqua && maintenant < masqueJusqua) return null
   const quantiteAttendueMl = quantiteAttendue(maintenant, objectifMl)
   const retardMl = quantiteAttendueMl - buMl
   if (retardMl < RETARD_MINIMAL_ML) return null

@@ -5,10 +5,11 @@ interface Props {
   rappel: Rappel
   maintenant: Date
   boireLeFormatPropose: () => void
+  masquer: () => void
 }
 
 /** Signale un Retard et propose de boire pour le rattraper. */
-export function CarteRappel({ rappel, maintenant, boireLeFormatPropose }: Props) {
+export function CarteRappel({ rappel, maintenant, boireLeFormatPropose, masquer }: Props) {
   const attendu = enCentilitresArrondis(rappel.quantiteAttendueMl)
   const retard = enCentilitresArrondis(rappel.retardMl)
 
@@ -29,6 +30,14 @@ export function CarteRappel({ rappel, maintenant, boireLeFormatPropose }: Props)
         className="shrink-0 rounded-xl bg-eau-600 px-3 py-2 font-semibold text-white shadow active:bg-eau-700"
       >
         {`+ ${enCentilitres(rappel.formatProposeMl)}`}
+      </button>
+      <button
+        type="button"
+        aria-label="Masquer le Rappel"
+        onClick={masquer}
+        className="shrink-0 self-start rounded-full px-1 text-lg leading-none text-eau-700 dark:text-eau-300"
+      >
+        ✕
       </button>
     </section>
   )

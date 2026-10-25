@@ -25,6 +25,9 @@ interface Props {
 /** Durée pendant laquelle une Prise qui vient d'être ajoutée peut être annulée. */
 const DUREE_ANNULATION_MS = 5_000
 
+/** Durée pendant laquelle ✕ masque le Rappel. */
+const DUREE_MASQUAGE_RAPPEL_MS = 30 * 60_000
+
 interface PriseAjoutee {
   id: number
   formatMl: FormatDeVerreMl
@@ -40,7 +43,9 @@ export function EcranAujourdhui({ base, horloge }: Props) {
   // Le verre et le Rappel ne s'affichent qu'une fois les Prises et l'objectif connus.
   const progression =
     prisesChargees && objectifMl !== undefined ? { buMl: totalBu(prisesChargees, journee), objectifMl } : null
-  const rappel = progression && rappelA(maintenant, progression.buMl, progression.objectifMl)
+  // Pas besoin de survivre à un rechargement de la page.
+  const [rappelMasqueJusqua, setRappelMasqueJusqua] = useState<Date | null>(null)
+  const rappel = progression && rappelA(maintenant, progression.buMl, progression.objectifMl, rappelMasqueJusqua)
   const [derniereAjoutee, setDerniereAjoutee] = useState<PriseAjoutee | null>(null)
   const [menuOuvert, setMenuOuvert] = useState<number | null>(null)
   const [numeroDeVague, setNumeroDeVague] = useState(0)
@@ -85,6 +90,9 @@ export function EcranAujourdhui({ base, horloge }: Props) {
             rappel={rappel}
             maintenant={maintenant}
             boireLeFormatPropose={() => ajouter(rappel.formatProposeMl)}
+            masquer={() =>
+              setRappelMasqueJusqua(new Date(horloge.maintenant().getTime() + DUREE_MASQUAGE_RAPPEL_MS))
+            }
           />
         )}
 

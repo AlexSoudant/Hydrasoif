@@ -433,6 +433,20 @@ describe('Rappel', () => {
       expect(await screen.findByText('jeu. 15 oct.')).toBeInTheDocument()
       expect(screen.getByRole('status')).toBeEmptyDOMElement()
     })
+
+    it('se masque avec ✕ pendant 30 minutes, puis revient si le Retard persiste', async () => {
+      const ecran = demarrerA(new Date(2026, 9, 14, 15, 0))
+      const carte = await screen.findByRole('region', { name: 'Rappel' })
+
+      await ecran.utilisateur.click(within(carte).getByRole('button', { name: 'Masquer le Rappel' }))
+      expect(rappel()).not.toBeInTheDocument()
+
+      ecran.avancerJusqua(new Date(2026, 9, 14, 15, 29))
+      expect(rappel()).not.toBeInTheDocument()
+
+      ecran.avancerJusqua(new Date(2026, 9, 14, 15, 30))
+      expect(await screen.findByRole('region', { name: 'Rappel' })).toHaveTextContent('À 15h30 tu as normalement bu')
+    })
   })
 
   it("suit aussitôt un changement d'Objectif journalier", async () => {
