@@ -12,13 +12,30 @@ export function journeeDe(instant: Date): Journee {
   return `${debut.getFullYear()}-${mois}-${jour}`
 }
 
+/** L'instant local à une heure donnée, `decalageJours` jours après la date de début de la Journée. */
+function instantLocal(journee: Journee, decalageJours: number, heures: number, minutes = 0): Date {
+  const [annee, mois, jour] = journee.split('-').map(Number)
+  return new Date(annee, mois - 1, jour + decalageJours, heures, minutes)
+}
+
 /** Premier et dernier instants (exclu) de la Journée, en millisecondes depuis l'époque Unix. */
 export function bornesDe(journee: Journee): { debut: number; fin: number } {
-  const [annee, mois, jour] = journee.split('-').map(Number)
   return {
-    debut: new Date(annee, mois - 1, jour, HEURE_DE_COUPURE).getTime(),
-    fin: new Date(annee, mois - 1, jour + 1, HEURE_DE_COUPURE).getTime(),
+    debut: instantLocal(journee, 0, HEURE_DE_COUPURE).getTime(),
+    fin: instantLocal(journee, 1, HEURE_DE_COUPURE).getTime(),
   }
+}
+
+/** L'instant de la Journée qui correspond à une heure « HH:MM » ; avant 4 h, c'est le lendemain. */
+export function instantDansJournee(journee: Journee, heure: string): Date {
+  const [heures, minutes] = heure.split(':').map(Number)
+  const decalageJours = heures < HEURE_DE_COUPURE ? 1 : 0
+  return instantLocal(journee, decalageJours, heures, minutes)
+}
+
+/** Une Prise ne peut être placée qu'entre le début de la Journée en cours et maintenant. */
+export function instantDePriseAutorise(instant: Date, maintenant: Date): boolean {
+  return journeeDe(instant) === journeeDe(maintenant) && instant <= maintenant
 }
 
 /** Contenances des Formats de verre, en millilitres. */
