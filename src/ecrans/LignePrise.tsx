@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import type { Prise } from './calcul/journee'
-import { enCentilitres, enHeure } from './format'
+import type { Prise } from '../calcul/journee'
+import { enCentilitres, enHeure } from '../format'
 
 interface Props {
   prise: Prise

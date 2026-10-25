@@ -175,3 +175,85 @@ describe("menu d'une Prise", () => {
   })
 })
 
+
+describe('Objectif journalier', () => {
+  const dixHeures = new Date(2026, 9, 14, 10, 0)
+
+  async function allerA(utilisateur: ReturnType<typeof userEvent.setup>, ecran: string) {
+    await utilisateur.click(within(screen.getByRole('navigation')).getByRole('button', { name: ecran }))
+  }
+
+  it("se règle dans les Réglages et s'affiche sur l'écran Aujourd'hui", async () => {
+    const utilisateur = userEvent.setup()
+    render(<App base={nouvelleBase()} horloge={horlogeFixe(dixHeures)} />)
+
+    await allerA(utilisateur, 'Réglages')
+    expect(await screen.findByText('1,50 L')).toBeInTheDocument()
+    await utilisateur.click(screen.getByRole('button', { name: "Augmenter l'objectif" }))
+    expect(await screen.findByText('1,75 L')).toBeInTheDocument()
+
+    await allerA(utilisateur, "Aujourd'hui")
+    expect(await screen.findByText('0 cl / 1,75 L')).toBeInTheDocument()
+  })
+
+  it('désactive − et + aux bornes de 1 L et 2 L', async () => {
+    const utilisateur = userEvent.setup()
+    render(<App base={nouvelleBase()} horloge={horlogeFixe(dixHeures)} />)
+    await allerA(utilisateur, 'Réglages')
+    const augmenter = await screen.findByRole('button', { name: "Augmenter l'objectif" })
+    const diminuer = screen.getByRole('button', { name: "Diminuer l'objectif" })
+
+    await utilisateur.click(augmenter)
+    await utilisateur.click(await screen.findByRole('button', { name: "Augmenter l'objectif" }))
+    expect(await screen.findByText('2,00 L')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: "Augmenter l'objectif" })).toBeDisabled()
+    expect(diminuer).toBeEnabled()
+
+    for (const attendu of ['1,75 L', '1,50 L', '1,25 L', '1,00 L']) {
+      await utilisateur.click(screen.getByRole('button', { name: "Diminuer l'objectif" }))
+      expect(await screen.findByText(attendu)).toBeInTheDocument()
+    }
+    expect(screen.getByRole('button', { name: "Diminuer l'objectif" })).toBeDisabled()
+    expect(screen.getByRole('button', { name: "Augmenter l'objectif" })).toBeEnabled()
+  })
+
+  it("garde l'objectif réglé après un rechargement de la page", async () => {
+    const utilisateur = userEvent.setup()
+    const nom = `test-${crypto.randomUUID()}`
+    const premiereVisite = render(<App base={creerBase(nom)} horloge={horlogeFixe(dixHeures)} />)
+    await allerA(utilisateur, 'Réglages')
+    await utilisateur.click(await screen.findByRole('button', { name: "Diminuer l'objectif" }))
+    expect(await screen.findByText('1,25 L')).toBeInTheDocument()
+    premiereVisite.unmount()
+
+    render(<App base={creerBase(nom)} horloge={horlogeFixe(dixHeures)} />)
+
+    expect(await screen.findByText('0 cl / 1,25 L')).toBeInTheDocument()
+  })
+
+  it("affiche un écran Historique vide pour l'instant", async () => {
+    const utilisateur = userEvent.setup()
+    render(<App base={nouvelleBase()} horloge={horlogeFixe(dixHeures)} />)
+
+    await allerA(utilisateur, 'Historique')
+
+    expect(screen.getByRole('heading', { name: 'Historique' })).toBeInTheDocument()
+    expect(screen.getByText("Aucune Journée passée pour l'instant.")).toBeInTheDocument()
+    expect(within(screen.getByRole('navigation')).getByRole('button', { name: 'Historique' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+  })
+
+  it('compte chaque appui, même rapproché', async () => {
+    const utilisateur = userEvent.setup()
+    render(<App base={nouvelleBase()} horloge={horlogeFixe(dixHeures)} />)
+    await allerA(utilisateur, 'Réglages')
+    const augmenter = await screen.findByRole('button', { name: "Augmenter l'objectif" })
+
+    await Promise.all([utilisateur.click(augmenter), utilisateur.click(augmenter)])
+
+    expect(await screen.findByText('2,00 L')).toBeInTheDocument()
+  })
+})
+
