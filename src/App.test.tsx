@@ -7,6 +7,7 @@ import type { FormatDeVerreMl } from './calcul/journee'
 import { enCentilitres } from './format'
 import { horlogeFixe } from './horloge'
 import { creerBase } from './stockage/base'
+import { horlogeReglable } from './test/horlogeReglable'
 
 function nouvelleBase() {
   return creerBase(`test-${crypto.randomUUID()}`)
@@ -324,6 +325,148 @@ describe('verre de progression', () => {
 
     expect(await within(verre).findByText('+50 cl')).toBeInTheDocument()
     expect(within(verre).getByText('2,00 / 1,50 L')).toBeInTheDocument()
+  })
+})
+
+describe('Rappel', () => {
+  const rappel = () => screen.queryByRole('region', { name: 'Rappel' })
+
+  it('apparaît en cas de Retard et enregistre le verre proposé', async () => {
+    const utilisateur = userEvent.setup()
+    // À 11 h, la référence de démarrage attend 3/14 de 1,5 L, soit environ 32 cl.
+    render(<App base={nouvelleBase()} horloge={horlogeFixe(new Date(2026, 9, 14, 11, 0))} />)
+
+    const carte = await screen.findByRole('region', { name: 'Rappel' })
+    expect(carte).toHaveTextContent(
+      'À 11h tu as normalement bu 32 cl ! Reprends un verre de 32 cl pour rester dans la course :)',
+    )
+
+    await utilisateur.click(within(carte).getByRole('button', { name: '+ 50 cl' }))
+
+    expect(await screen.findByText('50 cl / 1,50 L')).toBeInTheDocument()
+    await waitFor(() => expect(rappel()).not.toBeInTheDocument())
+  })
+
+  it("n'apparaît pas tant que le Retard est inférieur à 12,5 cl", async () => {
+    render(<App base={nouvelleBase()} horloge={horlogeFixe(new Date(2026, 9, 14, 9, 0))} />)
+
+    expect(await screen.findByText('0 cl / 1,50 L')).toBeInTheDocument()
+    expect(rappel()).not.toBeInTheDocument()
+  })
+
+  describe('avec le temps simulé', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    function demarrerA(instant: Date, base = nouvelleBase()) {
+      // shouldAdvanceTime : IndexedDB simulée et findBy* continuent d'avancer en temps réel.
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+        shouldAdvanceTime: true,
+      })
+      const horloge = horlogeReglable(instant)
+      render(<App base={base} horloge={horloge} />)
+      return {
+        utilisateur: userEvent.setup({ advanceTimers: vi.advanceTimersByTime }),
+        /** Fait passer le temps jusqu'à cet instant, comme sur un vrai téléphone. */
+        avancerJusqua(cible: Date) {
+          const ecartMs = cible.getTime() - horloge.maintenant().getTime()
+          horloge.regler(cible)
+          act(() => vi.advanceTimersByTime(ecartMs))
+        },
+        /** L'heure a changé pendant que l'application était en arrière-plan, puis elle revient. */
+        revenirAuPremierPlanA(cible: Date) {
+          horloge.regler(cible)
+          act(() => {
+            document.dispatchEvent(new Event('visibilitychange'))
+          })
+        },
+      }
+    }
+
+    it('vérifie le Retard chaque minute tant que l’application est ouverte', async () => {
+      const ecran = demarrerA(new Date(2026, 9, 14, 9, 0))
+      expect(await screen.findByText('0 cl / 1,50 L')).toBeInTheDocument()
+      expect(rappel()).not.toBeInTheDocument()
+
+      // À 9 h 10, la Quantité attendue atteint 12,5 cl.
+      ecran.avancerJusqua(new Date(2026, 9, 14, 9, 10))
+
+      expect(await screen.findByRole('region', { name: 'Rappel' })).toHaveTextContent(
+        'À 9h10 tu as normalement bu 12,5 cl ! Reprends un verre de 12,5 cl pour rester dans la course :)',
+      )
+    })
+
+    it("vérifie le Retard dès que l'application revient au premier plan", async () => {
+      const ecran = demarrerA(new Date(2026, 9, 14, 9, 0))
+      expect(await screen.findByText('0 cl / 1,50 L')).toBeInTheDocument()
+
+      ecran.revenirAuPremierPlanA(new Date(2026, 9, 14, 11, 0))
+
+      expect(await screen.findByRole('region', { name: 'Rappel' })).toHaveTextContent('À 11h tu as normalement bu')
+    })
+
+    it('passe tout seul à la nouvelle Journée à 4 h précises', async () => {
+      const base = nouvelleBase()
+      await base.ajouterPrise(250, new Date(2026, 9, 14, 23, 0))
+      const ecran = demarrerA(new Date(2026, 9, 15, 3, 59, 30), base)
+      expect(await screen.findByText('25 cl / 1,50 L')).toBeInTheDocument()
+      expect(screen.getByText('mer. 14 oct.')).toBeInTheDocument()
+
+      ecran.avancerJusqua(new Date(2026, 9, 15, 4, 0))
+
+      expect(await screen.findByText('jeu. 15 oct.')).toBeInTheDocument()
+      expect(await screen.findByText('0 cl / 1,50 L')).toBeInTheDocument()
+      await waitFor(() =>
+        expect(within(screen.getByRole('list', { name: 'Prises du jour' })).queryAllByRole('listitem')).toHaveLength(0),
+      )
+    })
+
+    it('ne garde pas le message « Annuler » de la veille sur la nouvelle Journée', async () => {
+      const ecran = demarrerA(new Date(2026, 9, 15, 3, 59, 58))
+      await ecran.utilisateur.click(await screen.findByRole('button', { name: '25 cl' }))
+      await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Prise de 25 cl ajoutée'))
+
+      ecran.avancerJusqua(new Date(2026, 9, 15, 4, 0))
+
+      expect(await screen.findByText('jeu. 15 oct.')).toBeInTheDocument()
+      expect(screen.getByRole('status')).toBeEmptyDOMElement()
+    })
+  })
+
+  it("suit aussitôt un changement d'Objectif journalier", async () => {
+    const utilisateur = userEvent.setup()
+    // À 15 h, avec 75 cl bus : rien d'attendu en plus pour 1,5 L (75 cl), mais 25 cl de Retard pour 2 L (100 cl).
+    const base = nouvelleBase()
+    await base.ajouterPrise(500, new Date(2026, 9, 14, 9, 0))
+    await base.ajouterPrise(250, new Date(2026, 9, 14, 12, 0))
+    render(<App base={base} horloge={horlogeFixe(new Date(2026, 9, 14, 15, 0))} />)
+    expect(await screen.findByText('75 cl / 1,50 L')).toBeInTheDocument()
+    expect(rappel()).not.toBeInTheDocument()
+
+    const navigation = screen.getByRole('navigation')
+    await utilisateur.click(within(navigation).getByRole('button', { name: 'Réglages' }))
+    await utilisateur.click(await screen.findByRole('button', { name: "Augmenter l'objectif" }))
+    await utilisateur.click(await screen.findByRole('button', { name: "Augmenter l'objectif" }))
+    expect(await screen.findByText('2,00 L')).toBeInTheDocument()
+    await utilisateur.click(within(navigation).getByRole('button', { name: "Aujourd'hui" }))
+
+    expect(await screen.findByRole('region', { name: 'Rappel' })).toHaveTextContent(
+      'À 15h tu as normalement bu 100 cl ! Reprends un verre de 25 cl pour rester dans la course :)',
+    )
+  })
+
+  it('reste affiché après le verre proposé si le Retard dépassait 50 cl', async () => {
+    const utilisateur = userEvent.setup()
+    // À 15 h, rien de bu : 75 cl de Retard, donc 25 cl restent après un verre de 50 cl.
+    render(<App base={nouvelleBase()} horloge={horlogeFixe(new Date(2026, 9, 14, 15, 0))} />)
+
+    await utilisateur.click(within(await screen.findByRole('region', { name: 'Rappel' })).getByRole('button', { name: '+ 50 cl' }))
+
+    expect(await screen.findByText('50 cl / 1,50 L')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Rappel' })).toHaveTextContent('Reprends un verre de 25 cl')
+    expect(within(screen.getByRole('region', { name: 'Rappel' })).getByRole('button', { name: '+ 25 cl' })).toBeInTheDocument()
   })
 })
 

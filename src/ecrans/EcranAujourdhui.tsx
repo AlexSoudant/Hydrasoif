@@ -7,10 +7,13 @@ import {
   journeeDe,
   totalBu,
 } from '../calcul/journee'
+import { rappelA } from '../calcul/rappel'
 import { enCentilitres, enJournee } from '../format'
 import type { Horloge } from '../horloge'
 import type { Base } from '../stockage/base'
 import { LignePrise } from './LignePrise'
+import { CarteRappel } from './CarteRappel'
+import { useMaintenant } from './useMaintenant'
 import { useObjectifDuJour } from './useObjectifDuJour'
 import { VerreDeProgression } from './VerreDeProgression'
 
@@ -28,14 +31,27 @@ interface PriseAjoutee {
 }
 
 export function EcranAujourdhui({ base, horloge }: Props) {
-  const journee = journeeDe(horloge.maintenant())
+  const maintenant = useMaintenant(horloge)
+  const journee = journeeDe(maintenant)
   // undefined tant que la base n'a pas répondu : le verre attend pour ne pas monter depuis 0 à l'ouverture.
   const prisesChargees = useLiveQuery(() => base.prisesDe(journee), [base, journee])
   const prises = prisesChargees ?? []
   const objectifMl = useObjectifDuJour(base, journee)
+  // Le verre et le Rappel ne s'affichent qu'une fois les Prises et l'objectif connus.
+  const progression =
+    prisesChargees && objectifMl !== undefined ? { buMl: totalBu(prisesChargees, journee), objectifMl } : null
+  const rappel = progression && rappelA(maintenant, progression.buMl, progression.objectifMl)
   const [derniereAjoutee, setDerniereAjoutee] = useState<PriseAjoutee | null>(null)
   const [menuOuvert, setMenuOuvert] = useState<number | null>(null)
   const [numeroDeVague, setNumeroDeVague] = useState(0)
+
+  // À 4 h, le message « Annuler » et le menu ouvert concernent la Journée précédente : on les oublie.
+  const [journeeAffichee, setJourneeAffichee] = useState(journee)
+  if (journeeAffichee !== journee) {
+    setJourneeAffichee(journee)
+    setDerniereAjoutee(null)
+    setMenuOuvert(null)
+  }
 
   useEffect(() => {
     if (!derniereAjoutee) return
@@ -64,8 +80,20 @@ export function EcranAujourdhui({ base, horloge }: Props) {
       </header>
 
       <main className="flex flex-1 flex-col gap-6 px-4 py-4">
-        {prisesChargees && objectifMl !== undefined && (
-          <VerreDeProgression buMl={totalBu(prises, journee)} objectifMl={objectifMl} numeroDeVague={numeroDeVague} />
+        {rappel && (
+          <CarteRappel
+            rappel={rappel}
+            maintenant={maintenant}
+            boireLeFormatPropose={() => ajouter(rappel.formatProposeMl)}
+          />
+        )}
+
+        {progression && (
+          <VerreDeProgression
+            buMl={progression.buMl}
+            objectifMl={progression.objectifMl}
+            numeroDeVague={numeroDeVague}
+          />
         )}
 
         <section className="flex flex-col gap-2">
