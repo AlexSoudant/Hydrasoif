@@ -83,19 +83,22 @@ export function VerreDeProgression({ buMl, objectifMl, numeroDeVague, quantiteAt
         </g>
 
         {attendu && (
-          <g
-            clipPath={`url(#${idInterieur})`}
-            style={{ transform: `translateY(${attendu.ordonnee}px)` }}
-            className="transition-transform duration-600 ease-out motion-reduce:transition-none"
-          >
-            <line
-              x1={0}
-              x2={200}
-              y1={0}
-              y2={0}
-              strokeDasharray="8 6"
-              className="stroke-eau-900 stroke-2 opacity-60 dark:stroke-eau-50"
-            />
+          // Découpe et déplacement sur deux groupes distincts : sur un même groupe, la forme de découpe
+          // se déplacerait avec la ligne et la masquerait entièrement.
+          <g clipPath={`url(#${idInterieur})`}>
+            <g
+              style={{ transform: `translateY(${attendu.ordonnee}px)` }}
+              className="transition-transform duration-600 ease-out motion-reduce:transition-none"
+            >
+              <line
+                x1={0}
+                x2={200}
+                y1={0}
+                y2={0}
+                strokeDasharray="8 6"
+                className="stroke-eau-900 stroke-2 opacity-60 dark:stroke-eau-50"
+              />
+            </g>
           </g>
         )}
 
@@ -117,6 +120,12 @@ export function VerreDeProgression({ buMl, objectifMl, numeroDeVague, quantiteAt
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-center [text-shadow:0_0_6px_var(--color-eau-50)] dark:[text-shadow:0_0_6px_var(--color-eau-950)]">
         <span className="text-2xl font-semibold tabular-nums">{libelleQuantites}</span>
         <span className="text-lg tabular-nums">{libelleProgression}</span>
+        {/* Déjà annoncé par aria-valuetext : masqué aux lecteurs d'écran pour ne pas le lire deux fois. */}
+        {attendu && (
+          <span aria-hidden="true" className="text-xs text-eau-700 tabular-nums dark:text-eau-300">
+            {attendu.libelle}
+          </span>
+        )}
         {atteint && <span className="text-sm font-medium">Objectif atteint, bravo !</span>}
       </div>
     </div>

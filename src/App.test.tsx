@@ -515,6 +515,12 @@ describe('ligne de Quantité attendue sur le verre', () => {
     await waitFor(async () => expect(await annonce()).toBe('0 cl / 1,50 L · 0 % · Attendu : 32 cl'))
   })
 
+  it('affiche aussi la Quantité attendue en toutes lettres dans le verre', async () => {
+    render(<App base={nouvelleBase()} horloge={horlogeFixe(new Date(2026, 9, 14, 11, 0))} />)
+
+    expect(await within(await verre()).findByText('Attendu : 32 cl')).toBeVisible()
+  })
+
   it('suit le Rythme habituel dès 3 Journées passées', async () => {
     const base = nouvelleBase()
     for (const jour of [11, 12, 13]) {
