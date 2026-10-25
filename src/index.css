@@ -10,6 +10,14 @@
   --color-eau-700: #0b5f9c;
   --color-eau-900: #0c3555;
   --color-eau-950: #071f33;
+
+  /* Vague à la surface de l'eau du verre de progression. */
+  --animate-vague: vague 3s linear infinite;
+  @keyframes vague {
+    to {
+      transform: translateX(-100px);
+    }
+  }
 }
 
 :root {

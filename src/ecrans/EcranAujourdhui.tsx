@@ -7,11 +7,12 @@ import {
   journeeDe,
   totalBu,
 } from '../calcul/journee'
-import { enCentilitres, enJournee, enLitres } from '../format'
+import { enCentilitres, enJournee } from '../format'
 import type { Horloge } from '../horloge'
 import type { Base } from '../stockage/base'
 import { LignePrise } from './LignePrise'
 import { useObjectifDuJour } from './useObjectifDuJour'
+import { VerreDeProgression } from './VerreDeProgression'
 
 interface Props {
   base: Base
@@ -59,9 +60,7 @@ export function EcranAujourdhui({ base, horloge }: Props) {
       </header>
 
       <main className="flex flex-1 flex-col gap-6 px-4 py-4">
-        <p className="text-center text-3xl font-semibold">
-          {objectifMl !== undefined && `${enCentilitres(totalBu(prises, journee))} / ${enLitres(objectifMl)}`}
-        </p>
+        {objectifMl !== undefined && <VerreDeProgression buMl={totalBu(prises, journee)} objectifMl={objectifMl} />}
 
         <section className="flex flex-col gap-2">
           <h2 id="titre-prises" className="text-sm font-medium text-eau-700 dark:text-eau-300">
