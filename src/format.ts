@@ -30,3 +30,14 @@ export function enJournee(journee: Journee): string {
 export function enNombreDeLitres(ml: number): string {
   return litres.format(ml / 1000)
 }
+
+/** 11:00 → « 11h », 11:37 → « 11h37 » */
+export function enHeureCourte(instant: Date): string {
+  const minutes = instant.getMinutes()
+  return `${instant.getHours()}h${minutes === 0 ? '' : String(minutes).padStart(2, '0')}`
+}
+
+/** 321 → « 32 cl », 125 → « 12,5 cl » : au demi-centilitre près, comme les Formats de verre. */
+export function enCentilitresArrondis(ml: number): string {
+  return enCentilitres(Math.round(ml / 5) * 5)
+}
