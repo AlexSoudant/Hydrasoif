@@ -1,0 +1,17 @@
+@import 'tailwindcss';
+
+/* Bleu eau. Le thème sombre suit le réglage du téléphone (variante dark: de Tailwind). */
+@theme {
+  --color-eau-50: #eff8ff;
+  --color-eau-100: #dbeefe;
+  --color-eau-300: #7cc4fa;
+  --color-eau-500: #1e96e6;
+  --color-eau-600: #0b78c4;
+  --color-eau-700: #0b5f9c;
+  --color-eau-900: #0c3555;
+  --color-eau-950: #071f33;
+}
+
+:root {
+  color-scheme: light dark;
+}
