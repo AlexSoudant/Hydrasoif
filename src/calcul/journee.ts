@@ -57,5 +57,3 @@ export function totalBu(prises: readonly Prise[], journee: Journee): number {
     .reduce((total, prise) => total + prise.formatMl, 0)
 }
 
-/** Objectif journalier appliqué tant qu'aucun n'a été réglé, en millilitres. */
-export const OBJECTIF_JOURNALIER_PAR_DEFAUT_ML = 1500

@@ -8,6 +8,7 @@ import {
   type Journee,
   type Prise,
 } from '../calcul/journee'
+import { objectifBorne, objectifDe, type ChangementObjectif } from '../calcul/objectif'
 
 const DEBUT_DE_JOURNEE = `${String(HEURE_DE_COUPURE).padStart(2, '0')}:00`
 
@@ -25,10 +26,28 @@ export class PriseNonModifiable extends Error {
 
 export class Base extends Dexie {
   prises!: EntityTable<Prise, 'id'>
+  /** Un réglage au plus par Journée : le dernier de la Journée remplace les précédents. */
+  objectifs!: EntityTable<ChangementObjectif, 'journee'>
 
   constructor(nom: string) {
     super(nom)
     this.version(1).stores({ prises: '++id, horodatage' })
+    this.version(2).stores({ objectifs: 'journee' })
+  }
+
+  /**
+   * Augmente ou diminue l'Objectif journalier à partir de la Journée donnée, sans sortir de 1 L–2 L.
+   * Lecture et écriture dans la même transaction : deux appuis rapprochés comptent pour deux pas.
+   */
+  async ajusterObjectif(journee: Journee, ecartMl: number): Promise<void> {
+    await this.transaction('rw', this.objectifs, async () => {
+      const actuelMl = objectifDe(journee, await this.objectifs.toArray())
+      await this.objectifs.put({ journee, objectifMl: objectifBorne(actuelMl + ecartMl) })
+    })
+  }
+
+  async changementsObjectif(): Promise<ChangementObjectif[]> {
+    return this.objectifs.toArray()
   }
 
   /** Enregistre une Prise et renvoie son identifiant. */
