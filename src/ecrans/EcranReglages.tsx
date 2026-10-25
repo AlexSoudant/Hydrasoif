@@ -7,6 +7,7 @@ import {
 import { enCentilitres, enLitres } from '../format'
 import type { Horloge } from '../horloge'
 import type { Base } from '../stockage/base'
+import { SectionSauvegarde } from './SectionSauvegarde'
 import { useObjectifDuJour } from './useObjectifDuJour'
 
 interface Props {
@@ -62,6 +63,8 @@ export function EcranReglages({ base, horloge }: Props) {
             {`De ${enLitres(OBJECTIF_JOURNALIER_MIN_ML)} à ${enLitres(OBJECTIF_JOURNALIER_MAX_ML)}, par pas de ${enCentilitres(PAS_OBJECTIF_JOURNALIER_ML)}. S'applique à partir d'aujourd'hui.`}
           </p>
         </section>
+
+        <SectionSauvegarde base={base} journee={journee} />
       </main>
     </div>
   )

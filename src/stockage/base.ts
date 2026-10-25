@@ -4,11 +4,13 @@ import {
   HEURE_DE_COUPURE,
   instantDePriseAutorise,
   journeeDe,
+  regrouperParJournee,
   type FormatDeVerreMl,
   type Journee,
   type Prise,
 } from '../calcul/journee'
 import { objectifBorne, objectifDe, type ChangementObjectif } from '../calcul/objectif'
+import { sansId, VERSION_DE_SAUVEGARDE, type Sauvegarde } from './sauvegarde'
 
 const DEBUT_DE_JOURNEE = `${String(HEURE_DE_COUPURE).padStart(2, '0')}:00`
 
@@ -70,6 +72,30 @@ export class Base extends Dexie {
       }
       await this.prises.update(id, { horodatage: instant.getTime() })
     })
+  }
+
+  /** Toutes les données, pour l'export. */
+  async exporter(): Promise<Sauvegarde> {
+    return this.transaction('r', this.prises, this.objectifs, async () => ({
+      version: VERSION_DE_SAUVEGARDE,
+      prises: (await this.prises.orderBy('horodatage').toArray()).map(sansId),
+      objectifs: await this.objectifs.toArray(),
+    }))
+  }
+
+  /** Remplace toutes les données par celles de la sauvegarde, en une seule transaction. */
+  async remplacerPar(sauvegarde: Sauvegarde): Promise<void> {
+    await this.transaction('rw', this.prises, this.objectifs, async () => {
+      await this.prises.clear()
+      await this.objectifs.clear()
+      await this.prises.bulkAdd(sauvegarde.prises)
+      await this.objectifs.bulkAdd(sauvegarde.objectifs)
+    })
+  }
+
+  /** Le nombre de Journées qui comptent au moins une Prise. */
+  async nombreDeJournees(): Promise<number> {
+    return regrouperParJournee(await this.prises.toArray()).size
   }
 
   /** Les Prises des Journées qui précèdent celle-ci (Rythme habituel, Historique). */
