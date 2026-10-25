@@ -45,7 +45,12 @@ export function EcranAujourdhui({ base, horloge }: Props) {
     prisesChargees && objectifMl !== undefined ? { buMl: totalBu(prisesChargees, journee), objectifMl } : null
   // Pas besoin de survivre à un rechargement de la page.
   const [rappelMasqueJusqua, setRappelMasqueJusqua] = useState<Date | null>(null)
-  const rappel = progression && rappelA(maintenant, progression.buMl, progression.objectifMl, rappelMasqueJusqua)
+  // Le Rappel attend aussi les Journées passées, pour ne pas s'afficher d'abord selon la Référence de démarrage.
+  const prisesPassees = useLiveQuery(() => base.prisesAvant(journee), [base, journee])
+  const rappel =
+    progression &&
+    prisesPassees &&
+    rappelA({ maintenant, ...progression, prisesPassees, masqueJusqua: rappelMasqueJusqua })
   const [derniereAjoutee, setDerniereAjoutee] = useState<PriseAjoutee | null>(null)
   const [menuOuvert, setMenuOuvert] = useState<number | null>(null)
   const [numeroDeVague, setNumeroDeVague] = useState(0)

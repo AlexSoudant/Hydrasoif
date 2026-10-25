@@ -482,5 +482,20 @@ describe('Rappel', () => {
     expect(screen.getByRole('region', { name: 'Rappel' })).toHaveTextContent('Reprends un verre de 25 cl')
     expect(within(screen.getByRole('region', { name: 'Rappel' })).getByRole('button', { name: '+ 25 cl' })).toBeInTheDocument()
   })
+
+  it('suit le Rythme habituel dès 3 Journées passées', async () => {
+    const base = nouvelleBase()
+    // Les 11, 12 et 13 octobre : la moitié de l'eau bue avant 11 h.
+    for (const jour of [11, 12, 13]) {
+      await base.ajouterPrise(500, new Date(2026, 9, jour, 9, 0))
+      await base.ajouterPrise(500, new Date(2026, 9, jour, 13, 0))
+    }
+    render(<App base={base} horloge={horlogeFixe(new Date(2026, 9, 14, 11, 0))} />)
+
+    // La Référence de démarrage aurait attendu 32 cl ; le Rythme habituel en attend la moitié de 1,5 L.
+    expect(await screen.findByRole('region', { name: 'Rappel' })).toHaveTextContent(
+      'À 11h tu as normalement bu 75 cl ! Reprends un verre de 75 cl pour rester dans la course :)',
+    )
+  })
 })
 
