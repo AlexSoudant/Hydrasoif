@@ -50,10 +50,19 @@ export interface Prise {
   horodatage: number
 }
 
+/** La quantité totale de ces Prises, en millilitres. */
+export function sommeDes(prises: readonly Prise[]): number {
+  return prises.reduce((total, prise) => total + prise.formatMl, 0)
+}
+
 /** Ce qui a été bu pendant la Journée, en millilitres. */
 export function totalBu(prises: readonly Prise[], journee: Journee): number {
-  return prises
-    .filter((prise) => journeeDe(new Date(prise.horodatage)) === journee)
-    .reduce((total, prise) => total + prise.formatMl, 0)
+  return sommeDes(prises.filter((prise) => journeeDe(new Date(prise.horodatage)) === journee))
+}
+
+/** Minutes écoulées depuis le début de la Journée (4 h), à l'heure locale : 0 à 4 h, 1439 à 3 h 59. */
+export function minuteDeJournee(instant: Date): number {
+  const minutesDepuisMinuit = instant.getHours() * 60 + instant.getMinutes()
+  return (minutesDepuisMinuit - HEURE_DE_COUPURE * 60 + 24 * 60) % (24 * 60)
 }
 
