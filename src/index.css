@@ -10,6 +10,20 @@
   --color-eau-700: #0b5f9c;
   --color-eau-900: #0c3555;
   --color-eau-950: #071f33;
+
+  /* Vague qui agite la surface de l'eau du verre de progression à chaque Prise, puis s'apaise.
+     Les deux tracés ont les mêmes commandes que SURFACE_DE_L_EAU (VerreDeProgression.tsx) pour être interpolés. */
+  --animate-vague: vague 1.2s ease-out;
+  @keyframes vague {
+    from {
+      d: path('M0 4 q25 -8 50 0 t50 0 t50 0 t50 0 t50 0 t50 0 V240 H0 Z');
+      transform: translateX(0);
+    }
+    to {
+      d: path('M0 4 q25 0 50 0 t50 0 t50 0 t50 0 t50 0 t50 0 V240 H0 Z');
+      transform: translateX(-100px);
+    }
+  }
 }
 
 :root {

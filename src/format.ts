@@ -12,7 +12,7 @@ export function enCentilitres(ml: number): string {
 
 /** 1500 → « 1,50 L » */
 export function enLitres(ml: number): string {
-  return `${litres.format(ml / 1000)} L`
+  return `${enNombreDeLitres(ml)} L`
 }
 
 /** « 10:30 » */
@@ -24,4 +24,9 @@ export function enHeure(horodatage: number): string {
 export function enJournee(journee: Journee): string {
   const [annee, mois, jour] = journee.split('-').map(Number)
   return date.format(new Date(annee, mois - 1, jour))
+}
+
+/** 1625 → « 1,63 » */
+export function enNombreDeLitres(ml: number): string {
+  return litres.format(ml / 1000)
 }

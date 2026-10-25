@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { act } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
+import type { FormatDeVerreMl } from './calcul/journee'
+import { enCentilitres } from './format'
 import { horlogeFixe } from './horloge'
 import { creerBase } from './stockage/base'
 
@@ -254,6 +256,74 @@ describe('Objectif journalier', () => {
     await Promise.all([utilisateur.click(augmenter), utilisateur.click(augmenter)])
 
     expect(await screen.findByText('2,00 L')).toBeInTheDocument()
+  })
+})
+
+
+describe('verre de progression', () => {
+  const midi = new Date(2026, 9, 14, 12, 0)
+
+  async function ecranAvecPrises(...formatsMl: FormatDeVerreMl[]) {
+    const utilisateur = userEvent.setup()
+    render(<App base={nouvelleBase()} horloge={horlogeFixe(midi)} />)
+    for (const formatMl of formatsMl) {
+      await utilisateur.click(screen.getByRole('button', { name: enCentilitres(formatMl) }))
+    }
+    return screen.findByRole('progressbar', { name: 'Eau bue aujourd’hui' })
+  }
+
+  it('est vide en début de Journée', async () => {
+    const verre = await ecranAvecPrises()
+
+    await waitFor(() => expect(verre).toHaveAttribute('aria-valuenow', '0'))
+    expect(verre).toHaveAttribute('aria-valuemin', '0')
+    expect(verre).toHaveAttribute('aria-valuemax', '1500')
+    expect(within(verre).getByText('0 cl / 1,50 L')).toBeInTheDocument()
+    expect(within(verre).getByText('0 %')).toBeInTheDocument()
+  })
+
+  it('se remplit en proportion de l’Objectif journalier', async () => {
+    const verre = await ecranAvecPrises(250)
+
+    await waitFor(() => expect(verre).toHaveAttribute('aria-valuenow', '250'))
+    expect(within(verre).getByText('25 cl / 1,50 L')).toBeInTheDocument()
+    expect(within(verre).getByText('17 %')).toBeInTheDocument()
+  })
+
+  it('est plein et félicite quand l’Objectif journalier est atteint', async () => {
+    const verre = await ecranAvecPrises(500, 500, 500)
+
+    await waitFor(() => expect(verre).toHaveAttribute('aria-valuenow', '1500'))
+    expect(within(verre).getByText('1,50 / 1,50 L')).toBeInTheDocument()
+    expect(within(verre).getByText('100 %')).toBeInTheDocument()
+    expect(within(verre).getByText('Objectif atteint, bravo !')).toBeInTheDocument()
+  })
+
+  it('reste plein et affiche le dépassement au-delà de l’objectif', async () => {
+    const verre = await ecranAvecPrises(500, 500, 500, 125)
+
+    await waitFor(() => expect(verre).toHaveAttribute('aria-valuenow', '1500'))
+    expect(within(verre).getByText('1,63 / 1,50 L')).toBeInTheDocument()
+    expect(within(verre).getByText('+12,5 cl')).toBeInTheDocument()
+    expect(within(verre).getByText('Objectif atteint, bravo !')).toBeInTheDocument()
+  })
+
+  it('ne félicite pas avant que l’objectif soit atteint', async () => {
+    const verre = await ecranAvecPrises(500, 500, 250, 125)
+
+    await waitFor(() => expect(verre).toHaveAttribute('aria-valuenow', '1375'))
+    expect(within(verre).getByText('92 %')).toBeInTheDocument()
+    expect(within(verre).queryByText('Objectif atteint, bravo !')).not.toBeInTheDocument()
+  })
+
+  it('permet de continuer à enregistrer des Prises au-delà de 100 %', async () => {
+    const verre = await ecranAvecPrises(500, 500, 500)
+    await waitFor(() => expect(verre).toHaveAttribute('aria-valuenow', '1500'))
+
+    await userEvent.setup().click(screen.getByRole('button', { name: '50 cl' }))
+
+    expect(await within(verre).findByText('+50 cl')).toBeInTheDocument()
+    expect(within(verre).getByText('2,00 / 1,50 L')).toBeInTheDocument()
   })
 })
 

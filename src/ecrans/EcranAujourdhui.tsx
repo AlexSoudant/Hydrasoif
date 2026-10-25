@@ -7,11 +7,12 @@ import {
   journeeDe,
   totalBu,
 } from '../calcul/journee'
-import { enCentilitres, enJournee, enLitres } from '../format'
+import { enCentilitres, enJournee } from '../format'
 import type { Horloge } from '../horloge'
 import type { Base } from '../stockage/base'
 import { LignePrise } from './LignePrise'
 import { useObjectifDuJour } from './useObjectifDuJour'
+import { VerreDeProgression } from './VerreDeProgression'
 
 interface Props {
   base: Base
@@ -28,10 +29,13 @@ interface PriseAjoutee {
 
 export function EcranAujourdhui({ base, horloge }: Props) {
   const journee = journeeDe(horloge.maintenant())
-  const prises = useLiveQuery(() => base.prisesDe(journee), [base, journee]) ?? []
+  // undefined tant que la base n'a pas répondu : le verre attend pour ne pas monter depuis 0 à l'ouverture.
+  const prisesChargees = useLiveQuery(() => base.prisesDe(journee), [base, journee])
+  const prises = prisesChargees ?? []
   const objectifMl = useObjectifDuJour(base, journee)
   const [derniereAjoutee, setDerniereAjoutee] = useState<PriseAjoutee | null>(null)
   const [menuOuvert, setMenuOuvert] = useState<number | null>(null)
+  const [numeroDeVague, setNumeroDeVague] = useState(0)
 
   useEffect(() => {
     if (!derniereAjoutee) return
@@ -42,6 +46,7 @@ export function EcranAujourdhui({ base, horloge }: Props) {
   async function ajouter(formatMl: FormatDeVerreMl) {
     const id = await base.ajouterPrise(formatMl, horloge.maintenant())
     setDerniereAjoutee({ id, formatMl })
+    setNumeroDeVague((numero) => numero + 1)
   }
 
   /** Utilisé à la fois par « Annuler » et par le menu ⋮. */
@@ -59,9 +64,9 @@ export function EcranAujourdhui({ base, horloge }: Props) {
       </header>
 
       <main className="flex flex-1 flex-col gap-6 px-4 py-4">
-        <p className="text-center text-3xl font-semibold">
-          {objectifMl !== undefined && `${enCentilitres(totalBu(prises, journee))} / ${enLitres(objectifMl)}`}
-        </p>
+        {prisesChargees && objectifMl !== undefined && (
+          <VerreDeProgression buMl={totalBu(prises, journee)} objectifMl={objectifMl} numeroDeVague={numeroDeVague} />
+        )}
 
         <section className="flex flex-col gap-2">
           <h2 id="titre-prises" className="text-sm font-medium text-eau-700 dark:text-eau-300">
