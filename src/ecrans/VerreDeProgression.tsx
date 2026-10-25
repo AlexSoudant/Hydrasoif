@@ -4,6 +4,8 @@ import { enCentilitres, enLitres, enNombreDeLitres } from '../format'
 interface Props {
   buMl: number
   objectifMl: number
+  /** Augmente à chaque Prise enregistrée : relance la vague. 0 : surface calme. */
+  numeroDeVague: number
 }
 
 // Repère du SVG : ordonnées du bord et du fond du verre, et son tracé.
@@ -11,12 +13,12 @@ const Y_BORD = 20
 const Y_FOND = 230
 const TRACE_DU_VERRE = 'M30 20 L170 20 L152 230 L48 230 Z'
 
-// Les crêtes de la vague sont à y = 0 du groupe d'eau : à 0 %, aucune goutte ne dépasse du fond.
-// Une période fait 100 px, la distance parcourue par l'animation `vague` (src/index.css).
-const SURFACE_DE_L_EAU = 'M0 4 q25 -8 50 0 t50 0 t50 0 t50 0 t50 0 t50 0 V240 H0 Z'
+// Surface calme, à y = 4 du groupe d'eau : à 0 %, même les crêtes de la vague restent sous le fond.
+// L'animation `vague` (src/index.css) part d'un tracé ondulé aux mêmes commandes et revient à celui-ci.
+const SURFACE_DE_L_EAU = 'M0 4 q25 0 50 0 t50 0 t50 0 t50 0 t50 0 t50 0 V240 H0 Z'
 
 /** Un verre d'eau qui se remplit jusqu'à l'Objectif journalier, puis déborde. */
-export function VerreDeProgression({ buMl, objectifMl }: Props) {
+export function VerreDeProgression({ buMl, objectifMl, numeroDeVague }: Props) {
   const idInterieur = useId()
   const atteint = buMl >= objectifMl
   const deborde = buMl > objectifMl
@@ -51,9 +53,11 @@ export function VerreDeProgression({ buMl, objectifMl }: Props) {
             style={{ transform: `translateY(${niveau}px)` }}
             className="transition-transform duration-600 ease-out motion-reduce:transition-none"
           >
+            {/* Changer de clé recrée le tracé, ce qui relance l'animation. */}
             <path
+              key={numeroDeVague}
               d={SURFACE_DE_L_EAU}
-              className="animate-vague fill-eau-500 motion-reduce:animate-none dark:fill-eau-600"
+              className={`fill-eau-500 dark:fill-eau-600 ${numeroDeVague > 0 ? 'animate-vague motion-reduce:animate-none' : ''}`}
             />
           </g>
         </g>
