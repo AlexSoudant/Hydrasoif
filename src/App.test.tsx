@@ -499,3 +499,63 @@ describe('Rappel', () => {
   })
 })
 
+describe('ligne de Quantité attendue sur le verre', () => {
+  const verre = () => screen.findByRole('progressbar', { name: 'Eau bue aujourd’hui' })
+  /** Le libellé est annoncé une seule fois, dans le texte de la barre de progression. */
+  const annonce = async () => (await verre()).getAttribute('aria-valuetext')
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('indique la Quantité attendue à cet instant', async () => {
+    // À 11 h, la Référence de démarrage attend 3/14 de 1,5 L, soit environ 32 cl.
+    render(<App base={nouvelleBase()} horloge={horlogeFixe(new Date(2026, 9, 14, 11, 0))} />)
+
+    await waitFor(async () => expect(await annonce()).toBe('0 cl / 1,50 L · 0 % · Attendu : 32 cl'))
+  })
+
+  it('suit le Rythme habituel dès 3 Journées passées', async () => {
+    const base = nouvelleBase()
+    for (const jour of [11, 12, 13]) {
+      await base.ajouterPrise(500, new Date(2026, 9, jour, 9, 0))
+      await base.ajouterPrise(500, new Date(2026, 9, jour, 13, 0))
+    }
+    render(<App base={base} horloge={horlogeFixe(new Date(2026, 9, 14, 11, 0))} />)
+
+    await waitFor(async () => expect(await annonce()).toContain('Attendu : 75 cl'))
+  })
+
+  it('avance à chaque minute', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true })
+    const horloge = horlogeReglable(new Date(2026, 9, 14, 11, 0))
+    render(<App base={nouvelleBase()} horloge={horloge} />)
+    await waitFor(async () => expect(await annonce()).toContain('Attendu : 32 cl'))
+
+    horloge.regler(new Date(2026, 9, 14, 11, 1))
+    act(() => vi.advanceTimersByTime(60_000))
+
+    await waitFor(async () => expect(await annonce()).toContain('Attendu : 32,5 cl'))
+  })
+
+  it('reste visible quand le Rappel est masqué', async () => {
+    const utilisateur = userEvent.setup()
+    render(<App base={nouvelleBase()} horloge={horlogeFixe(new Date(2026, 9, 14, 11, 0))} />)
+    const carte = await screen.findByRole('region', { name: 'Rappel' })
+
+    await utilisateur.click(within(carte).getByRole('button', { name: 'Masquer le Rappel' }))
+
+    expect(screen.queryByRole('region', { name: 'Rappel' })).not.toBeInTheDocument()
+    expect(await annonce()).toContain('Attendu : 32 cl')
+  })
+
+  it("disparaît une fois l'Objectif journalier atteint", async () => {
+    const utilisateur = userEvent.setup()
+    render(<App base={nouvelleBase()} horloge={horlogeFixe(new Date(2026, 9, 14, 11, 0))} />)
+    await waitFor(async () => expect(await annonce()).toContain('Attendu : 32 cl'))
+
+    for (let i = 0; i < 3; i++) await utilisateur.click(screen.getByRole('button', { name: '50 cl' }))
+
+    await waitFor(async () => expect(await annonce()).toBe('1,50 / 1,50 L · 100 %'))
+  })
+})

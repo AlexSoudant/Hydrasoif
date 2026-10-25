@@ -1,11 +1,13 @@
 import { useId } from 'react'
-import { enCentilitres, enLitres, enNombreDeLitres } from '../format'
+import { enCentilitres, enCentilitresArrondis, enLitres, enNombreDeLitres } from '../format'
 
 interface Props {
   buMl: number
   objectifMl: number
   /** Augmente à chaque Prise enregistrée : relance la vague. 0 : surface calme. */
   numeroDeVague: number
+  /** Quantité attendue à cet instant, tracée en pointillés tant que l'objectif n'est pas atteint. */
+  quantiteAttendueMl?: number
 }
 
 // Repère du SVG : ordonnées du bord et du fond du verre, et son tracé.
@@ -17,15 +19,33 @@ const TRACE_DU_VERRE = 'M30 20 L170 20 L152 230 L48 230 Z'
 // L'animation `vague` (src/index.css) part d'un tracé ondulé aux mêmes commandes et revient à celui-ci.
 const SURFACE_DE_L_EAU = 'M0 4 q25 0 50 0 t50 0 t50 0 t50 0 t50 0 t50 0 V240 H0 Z'
 
+/** Ordonnée, dans le SVG, d'un remplissage entre 0 (fond) et 1 (bord). */
+function ordonneeDu(remplissage: number): number {
+  return Y_FOND - remplissage * (Y_FOND - Y_BORD)
+}
+
+// La ligne de Quantité attendue reste à cette distance du fond et du bord, pour ne pas disparaître sous le contour.
+const MARGE_DE_LA_LIGNE = 6
+
 /** Un verre d'eau qui se remplit jusqu'à l'Objectif journalier, puis déborde. */
-export function VerreDeProgression({ buMl, objectifMl, numeroDeVague }: Props) {
+export function VerreDeProgression({ buMl, objectifMl, numeroDeVague, quantiteAttendueMl }: Props) {
   const idInterieur = useId()
   const atteint = buMl >= objectifMl
   const deborde = buMl > objectifMl
   const remplissage = Math.min(1, buMl / objectifMl)
   // Jamais « 100 % » tant que l'objectif n'est pas vraiment atteint.
   const pourcentage = atteint ? 100 : Math.min(99, Math.round(remplissage * 100))
-  const niveau = Y_FOND - remplissage * (Y_FOND - Y_BORD)
+  const niveau = ordonneeDu(remplissage)
+  const attendu =
+    !atteint && quantiteAttendueMl !== undefined
+      ? {
+          ordonnee: Math.min(
+            Y_FOND - MARGE_DE_LA_LIGNE,
+            Math.max(Y_BORD + MARGE_DE_LA_LIGNE, ordonneeDu(quantiteAttendueMl / objectifMl)),
+          ),
+          libelle: `Attendu : ${enCentilitresArrondis(quantiteAttendueMl)}`,
+        }
+      : null
 
   const bu = atteint ? enNombreDeLitres(buMl) : enCentilitres(buMl)
   const libelleQuantites = `${bu} / ${enLitres(objectifMl)}`
@@ -38,7 +58,7 @@ export function VerreDeProgression({ buMl, objectifMl, numeroDeVague }: Props) {
       aria-valuemin={0}
       aria-valuemax={objectifMl}
       aria-valuenow={Math.min(buMl, objectifMl)}
-      aria-valuetext={`${libelleQuantites} · ${libelleProgression}`}
+      aria-valuetext={[libelleQuantites, libelleProgression, attendu?.libelle].filter(Boolean).join(' · ')}
       className="relative mx-auto w-48"
     >
       <svg viewBox="0 0 200 240" aria-hidden="true" className="w-full overflow-visible">
@@ -61,6 +81,23 @@ export function VerreDeProgression({ buMl, objectifMl, numeroDeVague }: Props) {
             />
           </g>
         </g>
+
+        {attendu && (
+          <g
+            clipPath={`url(#${idInterieur})`}
+            style={{ transform: `translateY(${attendu.ordonnee}px)` }}
+            className="transition-transform duration-600 ease-out motion-reduce:transition-none"
+          >
+            <line
+              x1={0}
+              x2={200}
+              y1={0}
+              y2={0}
+              strokeDasharray="8 6"
+              className="stroke-eau-900 stroke-2 opacity-60 dark:stroke-eau-50"
+            />
+          </g>
+        )}
 
         <path
           d={TRACE_DU_VERRE}
