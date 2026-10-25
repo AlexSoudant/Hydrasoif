@@ -58,3 +58,21 @@ describe('rappelA', () => {
     expect(rappelA(quinzeHeures, 700, 2000)?.retardMl).toBe(300)
   })
 })
+
+describe('rappelA, Rappel masqué et Objectif journalier atteint', () => {
+  const quinzeHeures = le14a(15, 0)
+
+  it("n'affiche pas un Rappel masqué jusqu'à la fin du masquage", () => {
+    expect(rappelA(quinzeHeures, 0, 1500, le14a(15, 1))).toBeNull()
+  })
+
+  it('réaffiche le Rappel une fois le masquage terminé', () => {
+    expect(rappelA(quinzeHeures, 0, 1500, le14a(15, 0))?.retardMl).toBe(750)
+    expect(rappelA(quinzeHeures, 0, 1500, le14a(14, 30))?.retardMl).toBe(750)
+  })
+
+  it("n'affiche plus de Rappel une fois l'Objectif journalier atteint", () => {
+    expect(rappelA(le14a(23, 0), 1500, 1500)).toBeNull()
+    expect(rappelA(le14a(23, 0), 1750, 1500)).toBeNull()
+  })
+})

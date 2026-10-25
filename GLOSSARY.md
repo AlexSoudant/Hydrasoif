@@ -41,3 +41,7 @@ _Avoid_: Déficit, manque
 **Rappel**:
 Le message qui signale un Retard et propose de boire pour le rattraper.
 _Avoid_: Notification, alerte, reminder
+
+**Rappel masqué**:
+Un Rappel que l'utilisateur a écarté avec ✕ : il ne s'affiche plus pendant 30 minutes, puis revient si le Retard persiste.
+_Avoid_: Rappel ignoré, snooze, rappel fermé
